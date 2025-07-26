@@ -1,0 +1,143 @@
+#=================================================
+# https://github.com//Jaykwok2999/RunFilesBuilder
+# Description: Build RunFiles using GitHub Actions
+#=================================================
+name: Make Tailscale run files
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_version:
+        description: '这里是包版本'
+        required: false
+        default: 'packages-24.10'  
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04 
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Clone makeself repo
+        run: |
+          git clone https://github.com/megastep/makeself.git
+
+      - name: Create directories for x86_64 and a53 and set PACKAGE_VERSION
+        run: |
+          mkdir -p x86_64/depends a53/depends
+          package_version="${{ github.event.inputs.package_version }}"
+          if [ -z "$package_version" ]; then
+            package_version="packages-24.10"
+          fi
+          echo "PACKAGE_VERSION=$package_version" >> $GITHUB_ENV
+         
+
+      - name: Download ipk files for x86_64 and a53
+        run: |
+          echo "Get PACKAGE_VERSION=$PACKAGE_VERSION"
+          
+          FILE_PREFIXES=("tailscale" "luci-app-tailscale")
+          
+          
+          BASE_URL_X86="https://dl.openwrt.ai/$PACKAGE_VERSION/x86_64/kiddin9/"
+          echo "Fetching x86 directory page from $BASE_URL_X86"
+          wget -qO- "$BASE_URL_X86" | \
+          while IFS= read -r LINE; do
+              for PREFIX in "${FILE_PREFIXES[@]}"; do
+                  if [[ "$LINE" == *"$PREFIX"* ]]; then
+                      FILE=$(echo "$LINE" | grep -oP 'href="\K[^"]*')
+                      if [[ -z "$FILE" ]]; then
+                          # echo "No file found in line, skipping"
+                          continue
+                      fi
+                      exclude_file=false
+                      for exclude_prefix in "${EXCLUDE_PREFIXES[@]}"; do
+                          if [[ "$FILE" == $exclude_prefix* ]]; then
+                              exclude_file=true
+                              break
+                          fi
+                      done
+                      if $exclude_file; then
+                          echo "Skip file: $FILE"
+                          continue
+                      fi
+                      FILE_URL="${BASE_URL_X86}${FILE}"
+                      echo "Found file: $FILE_URL"
+                      curl -L --fail "$FILE_URL" -o "x86_64/depends/$(basename $FILE_URL)" -#
+                    fi
+              done
+          done
+
+          BASE_URL_A53="https://dl.openwrt.ai/$PACKAGE_VERSION/aarch64_cortex-a53/kiddin9/"
+          echo "Fetching a53 directory page from $BASE_URL_A53"
+          wget -qO- "$BASE_URL_A53" | \
+          while IFS= read -r LINE; do
+              for PREFIX in "${FILE_PREFIXES[@]}"; do
+                  if [[ "$LINE" == *"$PREFIX"* ]]; then
+                      FILE=$(echo "$LINE" | grep -oP 'href="\K[^"]*')
+                      if [[ -z "$FILE" ]]; then
+                          # echo "No file found in line, skipping"
+                          continue
+                      fi
+                      exclude_file=false
+                      for exclude_prefix in "${EXCLUDE_PREFIXES[@]}"; do
+                          if [[ "$FILE" == $exclude_prefix* ]]; then
+                              exclude_file=true
+                              break
+                          fi
+                      done
+                      if $exclude_file; then
+                          echo "Skip file: $FILE"
+                          continue
+                      fi
+                      FILE_URL="${BASE_URL_A53}${FILE}"
+                      echo "Found file: $FILE_URL"
+                      curl -L --fail "$FILE_URL" -o "a53/depends/$(basename $FILE_URL)" -#
+                  fi
+              done
+          done
+        
+      - name: List depends ipks
+        run: |
+          echo "List x86 depends ipk files"
+          ls -lh x86_64/depends/
+          echo "List a53 depends ipk files"
+          ls -lh a53/depends/
+          mv x86_64/depends/luci-app-tailscale*.ipk x86_64
+          mv a53/depends/luci-app-tailscale*.ipk a53
+      
+      - name: Create install.sh 
+        run: |
+            echo -e "opkg update \nopkg install depends/*.ipk \nopkg install *.ipk " > x86_64/install.sh
+            chmod +x x86_64/install.sh
+            cp x86_64/install.sh a53/
+  
+      - name: Create self-extracting archives
+        run: |
+            mv -f x86_64 makeself
+            mv -f a53 makeself
+            cd makeself
+            ipk_file=$(ls x86_64/*.ipk)
+            appversion=$(basename "$ipk_file" | grep -oP '\d+\.\d+\.\d+')
+            echo "APP_VERSION=$appversion" >> $GITHUB_ENV
+            release_name=$(TZ="Asia/Shanghai" date +'%Y-%m-%d %H:%M Build')
+            echo "RELEASE_NAME=$release_name" >> $GITHUB_ENV
+            ./makeself.sh x86_64/ tailscale_x86_64_$appversion.run "by github action" ./install.sh
+            ./makeself.sh a53/ tailscale_aarch64_cortex-a53_$appversion.run "by github action" ./install.sh
+            
+            
+      
+      - name: Upload all .run files to GitHub Release
+        uses: softprops/action-gh-release@v2.1.0
+        with:
+          tag_name: ${{ env.APP_VERSION }}
+          name: "Tailscale-${{ env.APP_VERSION }}"
+          body: "![Github](https://img.shields.io/badge/Tailscale.run-123456?logo=github&logoColor=fff&labelColor=blue&style=for-the-badge) ![GitHub Downloads (all assets, specific tag)](https://img.shields.io/github/downloads/Jaykwok2999/RunFilesBuilder/${{ env.APP_VERSION }}/total?style=for-the-badge&labelColor=black&color=%2325c2a0)"
+          files: makeself/*.run
+          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+   

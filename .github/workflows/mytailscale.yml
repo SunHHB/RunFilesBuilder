@@ -40,11 +40,9 @@ jobs:
           # 下载文件到对应目录
           mkdir -p tailscale_x86_64
           mkdir -p packages
-          wget https://github.com/SunHHB/op_x86_64/releases/download/X86_immortalwrt.git-openwrt-24.10/packages.tar.gz packages
-          cd ./packages/
-          ls *.tar.gz | xargs -n1 tar xzvf
+          wget https://github.com/SunHHB/op_x86_64/releases/download/X86_immortalwrt.git-openwrt-24.10/packages.tar.gz
+          ls *.tar.gz | xargs -n1 tar xzvf -C  ./packages/
           rm *tar.gz
-          cd ..
           find ./packages/ -iname "*tailscale*" -exec mv -f {} ./tailscale_x86_64/ \;
 
    

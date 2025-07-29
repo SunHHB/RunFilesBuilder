@@ -12,7 +12,7 @@ on:
         description: 'tag of luci-tailscale, v1.**'
         required: true
         type: string
-        default: 'v1.2.6'
+        default: '1.2.6'
 
 jobs:
   build:
@@ -61,7 +61,7 @@ jobs:
         run: |
             mv -f x86_64 makeself
             cd makeself
-            ./makeself.sh x86_64/ tailscale_x86_64_$appversion.run "by github action" ./install.sh
+            ./makeself.sh x86_64/ tailscale_x86_64_$latest_tag.run "by github action" ./install.sh
             
             
       

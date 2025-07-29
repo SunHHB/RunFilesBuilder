@@ -8,10 +8,11 @@ name: Make myTailscale run files
 on:
   workflow_dispatch:
     inputs:
-      package_version:
-        description: '这里是包版本'
+      tag:
+        description: 'tag of luci-tailscale, v1.**'
         required: true
-        default: '1.2.6'  
+        type: string
+        default: 'v1.2.6'
 
 jobs:
   build:

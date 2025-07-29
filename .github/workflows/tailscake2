@@ -1,0 +1,77 @@
+
+#=================================================
+# https://github.com//Jaykwok2999/RunFilesBuilder
+# Description: Build RunFiles using GitHub Actions
+#=================================================
+name: Make Tailscale run files
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_version:
+        description: '这里是包版本'
+        required: false
+        default: '1.2.6'  
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04 
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Clone makeself repo
+        run: |
+          git clone https://github.com/megastep/makeself.git
+
+      - name: Create directories for x86_64 and a53 and set PACKAGE_VERSION
+        run: |
+          mkdir -p x86_64/depends packages
+
+
+      - name: Download ipk files for x86_64 and a53
+        run: |
+          wget https://github.com/SunHHB/op_x86_64/releases/download/X86_immortalwrt.git-openwrt-24.10/packages.tar.gz
+          mv packages.tar.gz packages/
+          cd ./packages/
+          ls *.tar.gz | xargs -n1 tar xzvf
+          rm *tar.gz
+          cd ..
+          find ./packages/ -iname "*tailscale*" -exec mv -f {} ./x86_64/ \;
+        
+      - name: List depends ipks
+        run: |
+          echo "List x86 depends ipk files"
+          mv x86_64/tailscale*.ipk x86_64/depends
+      
+      - name: Create install.sh 
+        run: |
+            echo -e "opkg update \nopkg install depends/*.ipk \nopkg install *.ipk " > x86_64/install.sh
+            chmod +x x86_64/install.sh
+  
+      - name: Create self-extracting archives
+        run: |
+            mv -f x86_64 makeself
+            cd makeself
+            ipk_file=$(ls x86_64/*.ipk)
+            appversion=${{ github.event.inputs.tag }}
+            echo "APP_VERSION=$appversion" >> $GITHUB_ENV
+            release_name=$(TZ="Asia/Shanghai" date +'%Y-%m-%d %H:%M Build')
+            echo "RELEASE_NAME=$release_name" >> $GITHUB_ENV
+            ./makeself.sh x86_64/ tailscale_x86_64_$appversion.run "by github action" ./install.sh
+            
+            
+      
+      - name: Upload all .run files to GitHub Release
+        uses: softprops/action-gh-release@v2.1.0
+        with:
+          tag_name: ${{ env.APP_VERSION }}
+          name: "Tailscale-${{ env.APP_VERSION }}"
+          body: "![Github](https://img.shields.io/badge/Tailscale.run-123456?logo=github&logoColor=fff&labelColor=blue&style=for-the-badge) ![GitHub Downloads (all assets, specific tag)](https://img.shields.io/github/downloads/Jaykwok2999/RunFilesBuilder/${{ env.APP_VERSION }}/total?style=for-the-badge&labelColor=black&color=%2325c2a0)"
+          files: makeself/*.run
+          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+   

@@ -61,7 +61,11 @@ jobs:
         run: |
             mv -f x86_64 makeself
             cd makeself
-            ./makeself.sh x86_64/ tailscale_x86_64_$latest_tag.run "by github action" ./install.sh
+            appversion=${{ github.event.inputs.tag }}
+            echo "APP_VERSION=$appversion" >> $GITHUB_ENV
+            release_name=$(TZ="Asia/Shanghai" date +'%Y-%m-%d %H:%M Build')
+            echo "RELEASE_NAME=$release_name" >> $GITHUB_ENV
+            ./makeself.sh x86_64/ tailscale_x86_64_$appversion.run "by github action" ./install.sh
             
             
       

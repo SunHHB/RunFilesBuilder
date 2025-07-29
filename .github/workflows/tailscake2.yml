@@ -20,7 +20,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-
+        
+      - name: Fetch latest release tag from tailscale
+        id: fetch_latest_tag
+        run: |
+          latest_tag=${{ github.event.inputs.tag }}
+          echo "LATEST_TAG=$latest_tag" >> $GITHUB_ENV
+          
       - name: Clone makeself repo
         run: |
           git clone https://github.com/megastep/makeself.git
@@ -54,10 +60,6 @@ jobs:
         run: |
             mv -f x86_64 makeself
             cd makeself
-            appversion=${{ github.event.inputs.tag }}
-            echo "APP_VERSION=$appversion" >> $GITHUB_ENV
-            release_name=$(TZ="Asia/Shanghai" date +'%Y-%m-%d %H:%M Build')
-            echo "RELEASE_NAME=$release_name" >> $GITHUB_ENV
             ./makeself.sh x86_64/ tailscale_x86_64_$appversion.run "by github action" ./install.sh
             
             
@@ -65,8 +67,8 @@ jobs:
       - name: Upload all .run files to GitHub Release
         uses: softprops/action-gh-release@v2.1.0
         with:
-          tag_name: ${{ env.APP_VERSION }}
-          name: "Tailscale-${{ env.APP_VERSION }}"
+          tag_name: ${{ env.LATEST_TAG }}
+          name: "tailscale-${{ env.LATEST_TAG }}"
           body: "![Github](https://img.shields.io/badge/Tailscale.run-123456?logo=github&logoColor=fff&labelColor=blue&style=for-the-badge) ![GitHub Downloads (all assets, specific tag)](https://img.shields.io/github/downloads/Jaykwok2999/RunFilesBuilder/${{ env.APP_VERSION }}/total?style=for-the-badge&labelColor=black&color=%2325c2a0)"
           files: makeself/*.run
           token: ${{ secrets.GITHUB_TOKEN }}

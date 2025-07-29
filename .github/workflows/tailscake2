@@ -3,7 +3,7 @@
 # https://github.com//Jaykwok2999/RunFilesBuilder
 # Description: Build RunFiles using GitHub Actions
 #=================================================
-name: Make Tailscale run files
+name: Make myTailscale run files
 
 on:
   workflow_dispatch:
@@ -25,7 +25,7 @@ jobs:
         run: |
           git clone https://github.com/megastep/makeself.git
 
-      - name: Create directories for x86_64 and a53 and set PACKAGE_VERSION
+      - name: Create directories for x86_64 
         run: |
           mkdir -p x86_64/depends packages
 
@@ -54,7 +54,6 @@ jobs:
         run: |
             mv -f x86_64 makeself
             cd makeself
-            ipk_file=$(ls x86_64/*.ipk)
             appversion=${{ github.event.inputs.tag }}
             echo "APP_VERSION=$appversion" >> $GITHUB_ENV
             release_name=$(TZ="Asia/Shanghai" date +'%Y-%m-%d %H:%M Build')

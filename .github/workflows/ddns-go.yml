@@ -1,0 +1,83 @@
+
+#=================================================
+# https://github.com//Jaykwok2999/RunFilesBuilder
+# Description: Build RunFiles using GitHub Actions
+#=================================================
+name: Make ddns-go run files
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'tag of luci-ddns-go, v1.**'
+        required: true
+        type: string
+        default: '6.12.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04 
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        
+      - name: Fetch latest release tag from ddns-go
+        id: fetch_latest_tag
+        run: |
+          latest_tag=${{ github.event.inputs.tag }}
+          echo "LATEST_TAG=$latest_tag" >> $GITHUB_ENV
+          
+      - name: Clone makeself repo
+        run: |
+          git clone https://github.com/megastep/makeself.git
+
+      - name: Create directories for x86_64 
+        run: |
+          mkdir -p x86_64/depends packages
+
+
+      - name: Download ipk files for x86_64 and a53
+        run: |
+          wget https://github.com/SunHHB/op_x86_64/releases/download/X86_immortalwrt.git-openwrt-24.10/packages.tar.gz
+          mv packages.tar.gz packages/
+          cd ./packages/
+          ls *.tar.gz | xargs -n1 tar xzvf
+          rm *tar.gz
+          cd ..
+          find ./packages/ -iname "*ddns-go*" -exec mv -f {} ./x86_64/ \;
+        
+      - name: List depends ipks
+        run: |
+          echo "List x86 depends ipk files"
+          mv x86_64/ddns-go*.ipk x86_64/depends
+      
+      - name: Create install.sh 
+        run: |
+            echo -e "opkg update \nopkg install depends/*.ipk \nopkg install *.ipk " > x86_64/install.sh
+            chmod +x x86_64/install.sh
+  
+      - name: Create self-extracting archives
+        run: |
+            mv -f x86_64 makeself
+            cd makeself
+            appversion=${{ github.event.inputs.tag }}
+            echo "APP_VERSION=$appversion" >> $GITHUB_ENV
+            release_name=$(TZ="Asia/Shanghai" date +'%Y-%m-%d %H:%M Build')
+            echo "RELEASE_NAME=$release_name" >> $GITHUB_ENV
+            ./makeself.sh x86_64/ ddns-go_x86_64_$appversion.run "by github action" ./install.sh
+            
+            
+      
+      - name: Upload all .run files to GitHub Release
+        uses: softprops/action-gh-release@v2.1.0
+        with:
+          tag_name: ${{ env.LATEST_TAG }}
+          name: "ddns-go-${{ env.LATEST_TAG }}"
+          body_path: ${{ github.workspace }}/common.md
+          files: makeself/*.run
+          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+   
